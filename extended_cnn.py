@@ -7,6 +7,7 @@ from torchvision.datasets import ImageFolder
 from torch.utils.data import DataLoader, Dataset
 from PIL import Image
 import pandas as pd
+import matplotlib.pyplot as plt
 
 # CNN definition
 class InitialCNN(nn.Module):
@@ -226,6 +227,14 @@ def test(model, device, test_loader):
 # Main function for training and evaluating the CNN
 # Includes data transforms, dataset loading, model initialization, and weight loading
 
+# Global lists to store metrics for both models
+initial_epoch_times = []
+initial_epoch_losses = []
+initial_epoch_accuracies = []
+extended_epoch_times = []
+extended_epoch_losses = []
+extended_epoch_accuracies = []
+
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -266,6 +275,12 @@ def main():
     train(initial_model, device, train_loader, criterion, optimizer)
     test(initial_model, device, test_loader)
 
+    # Store InitialCNN metrics
+    global epoch_times, epoch_losses, epoch_accuracies
+    initial_epoch_times.extend(epoch_times)
+    initial_epoch_losses.extend(epoch_losses)
+    initial_epoch_accuracies.extend(epoch_accuracies)
+
     # Save model weights for transfer learning
     torch.save(initial_model.state_dict(), "initial_cnn_weights.pth")
 
@@ -285,5 +300,43 @@ def main():
     train(extended_model, device, train_loader, criterion, optimizer)
     test(extended_model, device, test_loader)
 
+    # Store ExtendedCNN metrics
+    extended_epoch_times.extend(epoch_times)
+    extended_epoch_losses.extend(epoch_losses)
+    extended_epoch_accuracies.extend(epoch_accuracies)
+
 if __name__ == "__main__":
     main()
+
+    # Plotting metrics for comparison
+    epochs = list(range(1, 11))
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(epochs, initial_epoch_times, label='InitialCNN', color='blue')
+    plt.plot(epochs, extended_epoch_times, label='ExtendedCNN', color='red')
+    plt.xlabel('Epoch')
+    plt.ylabel('Time (s)')
+    plt.title('Epoch Time Comparison')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(epochs, initial_epoch_losses, label='InitialCNN', color='blue')
+    plt.plot(epochs, extended_epoch_losses, label='ExtendedCNN', color='red')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Epoch Loss Comparison')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(epochs, initial_epoch_accuracies, label='InitialCNN', color='blue')
+    plt.plot(epochs, extended_epoch_accuracies, label='ExtendedCNN', color='red')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy (%)')
+    plt.title('Epoch Accuracy Comparison')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
