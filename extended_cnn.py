@@ -7,6 +7,7 @@ from torchvision.datasets import ImageFolder
 from torch.utils.data import DataLoader, Dataset
 from PIL import Image
 import pandas as pd
+from torchviz import make_dot
 import matplotlib.pyplot as plt
 
 # CNN definition
@@ -284,6 +285,9 @@ def main():
     # Save model weights for transfer learning
     torch.save(initial_model.state_dict(), "initial_cnn_weights.pth")
 
+    # Save initial model for visualization in Netron
+    # torch.save(initial_model, "initial_cnn_model.pt")
+
     # Instantiate ExtendedCNN and load weights into its compatible conv_layer
     extended_model = ExtendedCNN().to(device)
     pretrained_weights = torch.load("initial_cnn_weights.pth")
@@ -293,6 +297,17 @@ def main():
     # Freeze the pretrained convolutional layer weights so they are not updated during training
     for param in extended_model.conv_layer.parameters():
         param.requires_grad = False
+
+    # Save extended model for visualization in Netron
+    # torch.save(extended_model, "extended_cnn_model.pt")
+
+    # Generate Torchviz graph for model architecture
+    dummy_input = torch.randn(1, 3, 250, 250).to(device)
+    initial_output = initial_model(dummy_input)
+    make_dot(initial_output, params=dict(initial_model.named_parameters())).render("initial_cnn_architecture", format="png")
+
+    extended_output = extended_model(dummy_input)
+    make_dot(extended_output, params=dict(extended_model.named_parameters())).render("extended_cnn_architecture", format="png")
 
     # Retrain or fine-tune ExtendedCNN if desired
     criterion = nn.CrossEntropyLoss()
