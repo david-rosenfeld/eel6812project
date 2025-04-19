@@ -7,8 +7,131 @@ from torchvision.datasets import ImageFolder
 from torch.utils.data import DataLoader, Dataset
 from PIL import Image
 import pandas as pd
+from torch.autograd import Function
 from torchviz import make_dot
 import matplotlib.pyplot as plt
+
+# Gradient Reversal Layer definition
+# This class defines a custom autograd function that performs identity in the forward pass
+# and reverses the gradient during backpropagation to enable adversarial learning.
+# This class is based on the Function class (torch.autograd.Function), which is used for
+# defining operations that need custom operations for the forward and backward pass.
+# The methods are defined using the @staticmethod decorator because they are overriding
+# functions form the parent class that also have this decorator.
+class GradientReversalLayer(Function):
+  
+    # Forward pass: returns the input as-is and stores lambda for use in the backward pass
+    @staticmethod
+    def forward(ctx, input, lambda_):
+        ctx.lambda_ = lambda_
+        return input.view_as(input)
+
+    # Backward pass: reverses the gradient and scales it by lambda
+    @staticmethod
+    def backward(ctx, grad_output):
+        return -ctx.lambda_ * grad_output, None
+
+# Wrapper module for the Gradient Reversal Layer
+# This module integrates the gradient reversal mechanism as a standard PyTorch layer
+class GRLWrapper(nn.Module):
+    # Initializes the GRL wrapper with the given lambda value
+    def __init__(self, lambda_):
+        super(GRLWrapper, self).__init__()
+        self.lambda_ = lambda_
+
+    # Applies the gradient reversal function to the input
+    def forward(self, x):
+        return GradientReversalLayer.apply(x, self.lambda_)
+
+# Domain Discriminator for adversarial domain classification
+# This module is a binary classifier that predicts whether features come from the source or target domain
+class DomainDiscriminator(nn.Module):
+    # Initializes the discriminator network with the specified input feature dimension
+    def __init__(self, input_dim=128*31*31):
+        super(DomainDiscriminator, self).__init__()
+        self.net = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(input_dim, 1024),
+            nn.ReLU(),
+            nn.Linear(1024, 1),
+            nn.Sigmoid()
+        )
+
+    # Performs a forward pass through the domain discriminator
+    def forward(self, x):
+        return self.net(x)
+
+# Domain Adversarial Trainer encapsulates the logic for adversarial domain adaptation
+# It jointly trains a label classifier on source data and a domain discriminator on both source and target data
+class DomainAdversarialTrainer:
+    def __init__(self, feature_extractor, label_classifier, domain_discriminator, grl_layer, source_loader, target_loader, device):
+        self.feature_extractor = feature_extractor
+        self.label_classifier = label_classifier
+        self.domain_discriminator = domain_discriminator
+        self.grl = grl_layer
+        self.source_loader = source_loader
+        self.target_loader = target_loader
+        self.device = device
+        self.label_criterion = nn.CrossEntropyLoss()
+        self.domain_criterion = nn.BCELoss()
+        self.optimizer = optim.Adam(list(self.feature_extractor.parameters()) +
+                                    list(self.label_classifier.parameters()) +
+                                    list(self.domain_discriminator.parameters()), lr=0.001)
+
+    def train_epoch(self):
+        self.feature_extractor.train()
+        self.label_classifier.train()
+        self.domain_discriminator.train()
+
+        total_class_loss = 0.0
+        total_domain_loss = 0.0
+        correct, total = 0, 0
+
+        target_iter = iter(self.target_loader)
+
+        for source_data, source_labels in self.source_loader:
+            try:
+                target_data, _ = next(target_iter)
+            except StopIteration:
+                target_iter = iter(self.target_loader)
+                target_data, _ = next(target_iter)
+
+            source_data, source_labels = source_data.to(self.device), source_labels.to(self.device)
+            target_data = target_data.to(self.device)
+
+            self.optimizer.zero_grad()
+
+            # Extract features
+            source_features = self.feature_extractor(source_data)
+            target_features = self.feature_extractor(target_data)
+
+            # Label prediction on source
+            class_outputs = self.label_classifier(source_features)
+            class_loss = self.label_criterion(class_outputs, source_labels)
+
+            # Domain prediction on source and target
+            domain_inputs = torch.cat([source_features, target_features], dim=0)
+            domain_labels = torch.cat([torch.ones(source_features.size(0)), torch.zeros(target_features.size(0))], dim=0).to(self.device)
+            domain_outputs = self.domain_discriminator(self.grl(domain_inputs)).view(-1)
+            domain_loss = self.domain_criterion(domain_outputs, domain_labels)
+
+            # Combine losses and backpropagate
+            total_loss = class_loss + domain_loss
+            total_loss.backward()
+            self.optimizer.step()
+
+            total_class_loss += class_loss.item()
+            total_domain_loss += domain_loss.item()
+            _, predicted = torch.max(class_outputs, 1)
+            total += source_labels.size(0)
+            correct += (predicted == source_labels).sum().item()
+
+        avg_class_loss = total_class_loss / len(self.source_loader)
+        avg_domain_loss = total_domain_loss / len(self.source_loader)
+        accuracy = 100.0 * correct / total
+
+        print(f"Class Loss: {avg_class_loss:.4f}, Domain Loss: {avg_domain_loss:.4f}, Accuracy: {accuracy:.2f}%")
+
 
 # CNN definition
 class InitialCNN(nn.Module):
