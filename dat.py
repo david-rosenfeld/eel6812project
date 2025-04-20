@@ -359,6 +359,28 @@ extended_epoch_times = []
 extended_epoch_losses = []
 extended_epoch_accuracies = []
 
+# Custom dataset for unlabeled domain adaptation (target domain)
+# This class loads all images under a root directory and ignores labels
+class UnlabeledImageDataset(Dataset):
+    def __init__(self, root_dir, transform=None):
+        self.image_paths = []
+        for subfolder in ["Fire", "No_Fire"]:
+            folder_path = os.path.join(root_dir, subfolder)
+            if os.path.isdir(folder_path):
+                self.image_paths.extend([os.path.join(folder_path, f)
+                                         for f in os.listdir(folder_path)
+                                         if f.lower().endswith((".jpg", ".jpeg", ".png"))])
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.image_paths)
+
+    def __getitem__(self, idx):
+        image = Image.open(self.image_paths[idx]).convert("RGB")
+        if self.transform:
+            image = self.transform(image)
+        return image, 0  # dummy label
+
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -375,20 +397,13 @@ def main():
         transforms.Normalize([0.5]*3, [0.5]*3)
     ])
 
-    # Load pre-split training dataset using ImageFolder
-    # Subfolders under 'Training' should be named 'fire' and 'nofire'
-    train_dataset = ImageFolder(root="./data/ForestFireDataset/Training", transform=transform)
+    # Load labeled source domain using ImageFolder (FLAME Training)
+    source_dataset = ImageFolder(root="./data/FLAME/Training", transform=transform)
+    source_loader = DataLoader(source_dataset, batch_size=32, shuffle=True)
 
-    # Load testing dataset from flat folder of images
-    # Labels are inferred from filenames: files starting with 'fire' are labeled 0, others labeled 1
-    test_dataset = TestDatasetFromFilenames("./data/ForestFireDataset/Testing", transform=transform)
-
-    # Create DataLoader for the training dataset
-    # Batch size is set to 32 to balance training speed, memory usage, and gradient stability
-    # Shuffle is enabled to randomize input order and improve generalization
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-
-    # Create DataLoader for the testing dataset
+    # Load unlabeled target domain using custom dataset (FLAME Test)
+    target_dataset = UnlabeledImageDataset(root="./data/FLAME/Test", transform=transform)
+    target_loader = DataLoader(target_dataset, batch_size=32, shuffle=True)
     # Batch size is 32 for consistency; shuffle is disabled to preserve original image order
     test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
