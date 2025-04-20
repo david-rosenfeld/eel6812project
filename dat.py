@@ -448,17 +448,6 @@ def main():
     for param in extended_model.conv_layer.parameters():
         param.requires_grad = False
 
-    # Save extended model for visualization in Netron
-    # torch.save(extended_model, "extended_cnn_model.pt")
-
-    # Generate Torchviz graph for model architecture
-    #dummy_input = torch.randn(1, 3, 250, 250).to(device)
-    #initial_output = initial_model(dummy_input)
-    #make_dot(initial_output, params=dict(initial_model.named_parameters())).render("initial_cnn_architecture", format="png")
-
-    #extended_output = extended_model(dummy_input)
-    #make_dot(extended_output, params=dict(extended_model.named_parameters())).render("extended_cnn_architecture", format="png")
-
     # Perform domain adversarial training instead of standard training on ExtendedCNN
     grl_layer = GRLWrapper(lambda_=1.0)
     domain_discriminator = DomainDiscriminator().to(device)
@@ -486,36 +475,6 @@ if __name__ == "__main__":
 
     # Plotting metrics for comparison
     epochs = list(range(1, 11))
-
-    # plt.figure(figsize=(10, 6))
-    # plt.plot(epochs, initial_epoch_times, label='InitialCNN', color='blue')
-    # plt.plot(epochs, extended_epoch_times, label='ExtendedCNN', color='red')
-    # plt.xlabel('Epoch')
-    # plt.ylabel('Time (s)')
-    # plt.title('Epoch Time Comparison')
-    # plt.legend()
-    # plt.grid(True)
-    # plt.show()
-
-    # plt.figure(figsize=(10, 6))
-    # plt.plot(epochs, initial_epoch_losses, label='InitialCNN', color='blue')
-    # plt.plot(epochs, extended_epoch_losses, label='ExtendedCNN', color='red')
-    # plt.xlabel('Epoch')
-    # plt.ylabel('Loss')
-    # plt.title('Epoch Loss Comparison')
-    # plt.legend()
-    # plt.grid(True)
-    # plt.show()
-
-    # plt.figure(figsize=(10, 6))
-    # plt.plot(epochs, initial_epoch_accuracies, label='InitialCNN', color='blue')
-    # plt.plot(epochs, extended_epoch_accuracies, label='ExtendedCNN', color='red')
-    # plt.xlabel('Epoch')
-    # plt.ylabel('Accuracy (%)')
-    # plt.title('Epoch Accuracy Comparison')
-    # plt.legend()
-    # plt.grid(True)
-    # plt.show()
 
     plt.figure(figsize=(10, 6))
     plt.plot(epochs, extended_epoch_times, label='ExtendedCNN (Adversarial Time)', color='purple')
