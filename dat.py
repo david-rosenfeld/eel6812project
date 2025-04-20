@@ -397,6 +397,16 @@ def main():
         transforms.Normalize([0.5]*3, [0.5]*3)
     ])
 
+    # Load pre-split training dataset using ImageFolder
+    # Subfolders under 'Training' should be named 'fire' and 'nofire'
+    train_dataset = ImageFolder(root="./data/ForestFireDataset/Training", transform=transform)
+    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+
+    # Load testing dataset from flat folder of images
+    # Labels are inferred from filenames: files starting with 'fire' are labeled 0, others labeled 1
+    test_dataset = TestDatasetFromFilenames("./data/ForestFireDataset/Testing", transform=transform)
+    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+
     # Load labeled source domain using ImageFolder (FLAME Training)
     source_dataset = ImageFolder(root="./data/FLAME/Training", transform=transform)
     source_loader = DataLoader(source_dataset, batch_size=32, shuffle=True)
@@ -404,9 +414,7 @@ def main():
     # Load unlabeled target domain using custom dataset (FLAME Test)
     target_dataset = UnlabeledImageDataset(root_dir="./data/FLAME/Test", transform=transform)
     target_loader = DataLoader(target_dataset, batch_size=32, shuffle=True)
-    # Batch size is 32 for consistency; shuffle is disabled to preserve original image order
-    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
-
+        
     # Instantiate and train the InitialCNN model
     initial_model = InitialCNN().to(device)
     criterion = nn.CrossEntropyLoss()
@@ -440,12 +448,12 @@ def main():
     # torch.save(extended_model, "extended_cnn_model.pt")
 
     # Generate Torchviz graph for model architecture
-    dummy_input = torch.randn(1, 3, 250, 250).to(device)
-    initial_output = initial_model(dummy_input)
-    make_dot(initial_output, params=dict(initial_model.named_parameters())).render("initial_cnn_architecture", format="png")
+    #dummy_input = torch.randn(1, 3, 250, 250).to(device)
+    #initial_output = initial_model(dummy_input)
+    #make_dot(initial_output, params=dict(initial_model.named_parameters())).render("initial_cnn_architecture", format="png")
 
-    extended_output = extended_model(dummy_input)
-    make_dot(extended_output, params=dict(extended_model.named_parameters())).render("extended_cnn_architecture", format="png")
+    #extended_output = extended_model(dummy_input)
+    #make_dot(extended_output, params=dict(extended_model.named_parameters())).render("extended_cnn_architecture", format="png")
 
     # Perform domain adversarial training instead of standard training on ExtendedCNN
     grl_layer = GRLWrapper(lambda_=1.0)
