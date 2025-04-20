@@ -402,7 +402,7 @@ def main():
     source_loader = DataLoader(source_dataset, batch_size=32, shuffle=True)
 
     # Load unlabeled target domain using custom dataset (FLAME Test)
-    target_dataset = UnlabeledImageDataset(root="./data/FLAME/Test", transform=transform)
+    target_dataset = UnlabeledImageDataset(root_dir="./data/FLAME/Test", transform=transform)
     target_loader = DataLoader(target_dataset, batch_size=32, shuffle=True)
     # Batch size is 32 for consistency; shuffle is disabled to preserve original image order
     test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
@@ -447,11 +447,22 @@ def main():
     extended_output = extended_model(dummy_input)
     make_dot(extended_output, params=dict(extended_model.named_parameters())).render("extended_cnn_architecture", format="png")
 
-    # Retrain or fine-tune ExtendedCNN if desired
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(extended_model.parameters(), lr=0.001)
-    train(extended_model, device, train_loader, criterion, optimizer)
-    test(extended_model, device, test_loader)
+    # Perform domain adversarial training instead of standard training on ExtendedCNN
+    grl_layer = GRLWrapper(lambda_=1.0)
+    domain_discriminator = DomainDiscriminator().to(device)
+    datrainer = DomainAdversarialTrainer(
+        feature_extractor=nn.Sequential(extended_model.conv_layer, extended_model.additional_conv),
+        label_classifier=extended_model.fc_layer,
+        domain_discriminator=domain_discriminator,
+        grl_layer=grl_layer,
+        source_loader=source_loader,
+        target_loader=target_loader,
+        device=device
+    )
+
+    for epoch in range(10):
+        print(f"Epoch {epoch+1} (Adversarial)")
+        datrainer.train_epoch()
 
     # Store ExtendedCNN metrics
     extended_epoch_times.extend(epoch_times)
