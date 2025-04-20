@@ -6,10 +6,10 @@ import torchvision.transforms as transforms
 from torchvision.datasets import ImageFolder
 from torch.utils.data import DataLoader, Dataset
 from PIL import Image
-import pandas as pd
+#import pandas as pd
 from torch.autograd import Function
-from torchviz import make_dot
 import matplotlib.pyplot as plt
+import time
 
 # Gradient Reversal Layer definition
 # This class defines a custom autograd function that performs identity in the forward pass
@@ -79,6 +79,7 @@ class DomainAdversarialTrainer:
                                     list(self.domain_discriminator.parameters()), lr=0.001)
 
     def train_epoch(self):
+        start_time = time.time()
         self.feature_extractor.train()
         self.label_classifier.train()
         self.domain_discriminator.train()
@@ -130,8 +131,10 @@ class DomainAdversarialTrainer:
         avg_domain_loss = total_domain_loss / len(self.source_loader)
         accuracy = 100.0 * correct / total
 
-        print(f"Class Loss: {avg_class_loss:.4f}, Domain Loss: {avg_domain_loss:.4f}, Accuracy: {accuracy:.2f}%")
+        end_time = time.time()
+        elapsed_time = end_time - start_time
 
+        print(f"Class Loss: {avg_class_loss:.4f}, Domain Loss: {avg_domain_loss:.4f}, Accuracy: {accuracy:.2f}%, Time: {elapsed_time:.2f} seconds")
 
 # CNN definition
 class InitialCNN(nn.Module):
@@ -241,8 +244,6 @@ class TestDatasetFromFilenames(Dataset):
 # Sets model to training mode, iterates through batches, computes gradients, and updates weights
 # Reports average loss and accuracy per epoch
 
-import time
-
 def train(model, device, train_loader, criterion, optimizer):
     # Declare global lists for metrics storage
     global epoch_times, epoch_losses, epoch_accuracies
@@ -350,6 +351,9 @@ def test(model, device, test_loader):
 
 # Main function for training and evaluating the CNN
 # Includes data transforms, dataset loading, model initialization, and weight loading
+
+# Global variable that will be the DAT trainer.
+datrainer = None
 
 # Global lists to store metrics for both models
 initial_epoch_times = []
@@ -483,22 +487,51 @@ if __name__ == "__main__":
     # Plotting metrics for comparison
     epochs = list(range(1, 11))
 
+    # plt.figure(figsize=(10, 6))
+    # plt.plot(epochs, initial_epoch_times, label='InitialCNN', color='blue')
+    # plt.plot(epochs, extended_epoch_times, label='ExtendedCNN', color='red')
+    # plt.xlabel('Epoch')
+    # plt.ylabel('Time (s)')
+    # plt.title('Epoch Time Comparison')
+    # plt.legend()
+    # plt.grid(True)
+    # plt.show()
+
+    # plt.figure(figsize=(10, 6))
+    # plt.plot(epochs, initial_epoch_losses, label='InitialCNN', color='blue')
+    # plt.plot(epochs, extended_epoch_losses, label='ExtendedCNN', color='red')
+    # plt.xlabel('Epoch')
+    # plt.ylabel('Loss')
+    # plt.title('Epoch Loss Comparison')
+    # plt.legend()
+    # plt.grid(True)
+    # plt.show()
+
+    # plt.figure(figsize=(10, 6))
+    # plt.plot(epochs, initial_epoch_accuracies, label='InitialCNN', color='blue')
+    # plt.plot(epochs, extended_epoch_accuracies, label='ExtendedCNN', color='red')
+    # plt.xlabel('Epoch')
+    # plt.ylabel('Accuracy (%)')
+    # plt.title('Epoch Accuracy Comparison')
+    # plt.legend()
+    # plt.grid(True)
+    # plt.show()
+
     plt.figure(figsize=(10, 6))
-    plt.plot(epochs, initial_epoch_times, label='InitialCNN', color='blue')
-    plt.plot(epochs, extended_epoch_times, label='ExtendedCNN', color='red')
+    plt.plot(epochs, extended_epoch_times, label='ExtendedCNN (Adversarial Time)', color='purple')
     plt.xlabel('Epoch')
     plt.ylabel('Time (s)')
-    plt.title('Epoch Time Comparison')
+    plt.title('Adversarial Epoch Time')
     plt.legend()
     plt.grid(True)
     plt.show()
 
     plt.figure(figsize=(10, 6))
-    plt.plot(epochs, initial_epoch_losses, label='InitialCNN', color='blue')
-    plt.plot(epochs, extended_epoch_losses, label='ExtendedCNN', color='red')
+    plt.plot(epochs, extended_epoch_losses, label='Class Loss (ExtendedCNN)', color='blue')
+    plt.plot(epochs, datrainer.epoch_domain_losses, label='Domain Loss (ExtendedCNN)', color='red')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
-    plt.title('Epoch Loss Comparison')
+    plt.title('Class Loss and Domain Loss per Epoch')
     plt.legend()
     plt.grid(True)
     plt.show()
